@@ -22,6 +22,11 @@ typedef struct _url {
 }url_t;
 
 #define url_parse(url) _url_parse(url, strlen(url))
+
+
+char * url_get_uri(url_t * url);
+url_t *_url_parse(char const *str, int length);
+void url_dump(url_t * url);
 void url_free(url_t * url);
 
 

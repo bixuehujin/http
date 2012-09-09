@@ -7,9 +7,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <assert.h>
 #include "helper.h"
 #include "url.h"
+#include "sstring.h"
 
 static inline const void *zend_memrchr(const void *s, int c, size_t n){
 	register const unsigned char *e;
@@ -320,6 +322,50 @@ url_t *_url_parse(char const *str, int length){
 	}
 end:
 	return ret;
+}
+
+
+char * url_get_uri(url_t * url) {
+	sstring_t ss ;
+	sstring_init(&ss);
+	if(url->path) {
+		sstring_append(&ss, url->path);
+	}
+	if(url->query) {
+		sstring_sprintf_append(&ss, "?%s", url->query);
+	}
+	if(url->fragment) {
+		sstring_sprintf_append(&ss, "#%s", url->fragment);
+	}
+	return ss.ptr;
+}
+
+
+void url_dump(url_t * url) {
+	if(url->scheme) {
+		printf("scheme:    %s\n", url->scheme);
+	}
+	if(url->host) {
+		printf("host:      %s\n", url->host);
+	}
+	if(url->port) {
+		printf("port:      %d\n", url->port);
+	}
+	if(url->user) {
+		printf("user:      %s\n", url->user);
+	}
+	if(url->pass) {
+		printf("pass:      %s\n", url->pass);
+	}
+	if(url->path) {
+		printf("path:      %s\n", url->path);
+	}
+	if(url->query) {
+		printf("query:     %s\n", url->query);
+	}
+	if(url->fragment) {
+		printf("fragment:  %s\n", url->fragment);
+	}
 }
 
 

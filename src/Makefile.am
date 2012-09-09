@@ -2,7 +2,9 @@ bin_PROGRAMS=http
 http_SOURCES=http.c \
 	http_conn.c \
 	../lib/slist.c \
-	url.c
+	url.c \
+	http_request.c \
+	../lib/sstring.c
 	
 
 http_CFLAGS=-I../lib

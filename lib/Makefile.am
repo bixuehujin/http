@@ -3,4 +3,4 @@ test_SOURCES=test.c \
 	sstring.c
 	
 
-test_CFLAGS = -g
+#test_CFLAGS = -g

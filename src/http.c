@@ -11,23 +11,42 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "http_conn.h"
+#include "http_request.h"
 #include "url.h"
 #include "slist.h"
 
-int main(void) {
+void on_state_change(int state, pointer data) {
+	http_request_t * req = data;
+	printf("State Changed: %d %s\n", state, state_names[state]);
+	if(state == STATE_HEADERS_RECEIVED) {
+		printf("Response: %d %s\n", req->status, req->status_txt);
+	}
+}
 
-	http_conn_t * conn = http_conn_new("localhost", 80);
-	slist_t * slist = slist_new(int, NULL);
+void on_load(char * res, pointer data) {
+	printf("Response Loaded:\n");
+	printf("%s\n", res);
+}
 
-	url_t * url = url_parse("http://hujin@www.baidu.com:80/index.php?a=b&c=d#abc");
-	printf("schema:  %s\n", url->scheme);
-	printf("host:    %s\n", url->host);
-	printf("port:    %d\n", url->port);
-	printf("path:    %s\n", url->path);
-	printf("user:    %s\n", url->user);
-	printf("pass:    %s\n", url->pass);
-	printf("query:   %s\n", url->query);
-	printf("fragment:%s\n", url->fragment);
-	url_free(url);
+int main(int argc, char * argv[]) {
+
+	if(argc < 2) {
+		printf("Usage: http url\n");
+		exit(1);
+	}
+
+	printf("%d\n", atoi("121 jk"));
+
+	http_request_t * req ;
+	req = http_request_new(argv[1]);
+	http_request_set_method(req, METHOD_HEAD);
+	http_request_set_version(req, "1.1");
+
+	http_request_on_state_change(req, on_state_change, req);
+	http_request_on_load(req, on_load, req);
+
+	http_request_preform(req);
+
+	http_request_free(req);
 	return 0;
 }

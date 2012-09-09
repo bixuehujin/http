@@ -32,7 +32,7 @@ typedef struct _slist{
 
 #define slist_new(type, dtor) _slist_new(sizeof(type), dtor)
 
-#define slist_destroy(pslist) slist_clear(pslist);\
+#define slist_free(pslist) slist_clear(pslist);\
 	free(pslist);\
 	pslist = NULL;
 
@@ -55,7 +55,7 @@ void slist_reverse_from_node(slist_node_t ** node);
 
 #define slist_appends(list, str) {\
 	string tmp = (string)strdup(str);\
-	slist_append(list, &tmp);\
+	slist_append(list, tmp);\
 }
 
 void slist_string_dtor_func(pointer data);

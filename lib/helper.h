@@ -30,4 +30,11 @@ static inline void * _m_newn(size_t size, size_t count, char c) {
 }
 
 
+static inline void * realloca(void * ptr, size_t osize, size_t nsize) {
+	void * nptr = alloca(nsize);
+
+	memcpy(nptr, ptr, osize);
+	return nptr;
+}
+
 #endif /* HELPER_H_ */

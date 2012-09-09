@@ -11,13 +11,17 @@ AC_ARG_ENABLE(debug, [--enable-debug	Enable debugging infomation],
 			USE_DEBUG="$enablevar", USE_DEBUG="no")
 if [ $USE_DEBUG = yes ] ; then
 	DEBUG=1
-	CFLAGS="$CFLAGS -g"
+	CFLAGS=`echo "$CFLAGS" | sed -e 's/-O[0-9s]*//g'`
+	CFLAGS="$CFLAGS -g -O0 -Wall"
 else 
 	DEBUG=1
 fi
 
-AC_PROG_CC
+CFLAGS=`echo "$CFLAGS" | sed -e 's/-O[0-9s]*//g'`
+CFLAGS="$CFLAGS -g -O0 -Wall"
 
+AC_PROG_CC
+AM_PROG_CC_C_O
 AC_CONFIG_FILES(Makefile \
 	src/Makefile \
 	curl/Makefile \
