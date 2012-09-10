@@ -12,7 +12,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include "helper.h"
 #include "http_conn.h"
 #include "url.h"
 
@@ -59,6 +58,6 @@ bool http_conn_connect(http_conn_t * conn) {
 void http_conn_free(http_conn_t * conn) {
 	assert(conn != NULL);
 	close(conn->connfd);
-	free(conn->host)
+	free(conn->host);
 	free(conn);
 }

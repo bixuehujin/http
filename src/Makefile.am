@@ -1,10 +1,10 @@
 bin_PROGRAMS=http
 http_SOURCES=http.c \
 	http_conn.c \
-	../lib/slist.c \
 	url.c \
-	http_request.c \
-	../lib/sstring.c
+	http_request.c
 	
 
-http_CFLAGS=-I../lib
+http_CFLAGS=-L../lib -lclib -I../lib/include 
+
+http_LDADD=../lib/libclib.a

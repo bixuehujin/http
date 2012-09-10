@@ -17,20 +17,20 @@ typedef struct _sstring{
 	char * ptr;
 }sstring_t;
 
-#define sstring_empty(pss) \
+#define sstring_empty(pss) 												\
 	(((pss)->ptr == NULL || (pss)->len == 0))
 
-#define sstring_for_init \
+#define sstring_for_init 												\
 	{0, 0, 0, NULL}
 
 
 sstring_t * sstring_new(size_t size);
-void string_init(sstring_t * ss, size_t size);
+void sstring_init(sstring_t * ss, size_t size);
 sstring_t * sstring_new_stack(size_t size);
 void sstring_init_stack(sstring_t * ss, size_t size);
-bool sstring_append(sstring_t * ss, const char * str);
-bool sstring_sprintf_append(sstring_t * ss, const char * format, ...);
-void string_destroy(sstring_t * ss);
+sstring_t * sstring_append(sstring_t * ss, const char * str);
+sstring_t * sstring_sprintf_append(sstring_t * ss, const char * format, ...);
+void sstring_destroy(sstring_t * ss);
 void sstring_free(sstring_t * ss);
 
 #endif /* SSTRING_H_ */

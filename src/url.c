@@ -9,9 +9,10 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <assert.h>
-#include "helper.h"
+
+#include <clib.h>
+
 #include "url.h"
-#include "sstring.h"
 
 static inline const void *zend_memrchr(const void *s, int c, size_t n){
 	register const unsigned char *e;
@@ -327,7 +328,7 @@ end:
 
 char * url_get_uri(url_t * url) {
 	sstring_t ss ;
-	sstring_init(&ss);
+	sstring_init(&ss, 100);
 	if(url->path) {
 		sstring_append(&ss, url->path);
 	}

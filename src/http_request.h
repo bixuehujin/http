@@ -8,16 +8,16 @@
 #ifndef HTTP_REQUEST_H_
 #define HTTP_REQUEST_H_
 
-#include "helper.h"
-#include "sstring.h"
+#include "clib.h"
 #include "http_conn.h"
-#include "slist.h"
 
-#define METHOD_HEAD 	0
-#define METHOD_GET 		1
-#define METHOD_POST 	2
-#define METHOD_PUT 		3
-#define METHOD_DELETE 	4
+#define METHOD_HEAD 		0
+#define METHOD_GET 			1
+#define METHOD_POST 		2
+#define METHOD_PUT 			3
+#define METHOD_DELETE 		4
+#define METHOD_TRACE		5
+#define METHOD_OPTIONS		6
 
 static char * method_names[] = {
 	"HEAD",
@@ -25,6 +25,8 @@ static char * method_names[] = {
 	"POST",
 	"PUT",
 	"DELETE",
+	"TRACE",
+	"OPTIONS",
 	NULL
 };
 
@@ -90,6 +92,13 @@ typedef struct _http_request {
 	http_state_t state;
 }http_request_t;
 
+#define http_request_on_ex(request, e, func, user_data) \
+	http_request_on_ ## e(request, func, user_data)
+
+#define http_request_on(request, e, func) \
+	http_request_on_ ## e(request, func, NULL)
+
+
 http_request_t * http_request_new(const char * url);
 void http_request_free(http_request_t * req);
 
@@ -106,7 +115,7 @@ void http_request_on_timeout(http_request_t *req, http_timeout_func_t cb, pointe
 void http_request_on_loadstart(http_request_t *req, http_loadstart_func_t cb, pointer user_data);
 
 char * http_request_get_response_header(http_request_t * req, const char * name);
-slist_t * http_request_get_response_headers(http_request_t * req);
+hash_table_t * http_request_parse_response_header(http_request_t * req);
 int http_request_get_response_status(http_request_t * req);
 char * http_request_get_response_status_txt(http_request_t * req);
 char * http_request_get_response(http_request_t * req);

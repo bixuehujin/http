@@ -9,8 +9,8 @@
 #include <assert.h>
 #include <malloc.h>
 #include <string.h>
-#include "helper.h"
-#include "slist.h"
+#include "clib/helper.h"
+#include "clib/slist.h"
 
 
 slist_t * _slist_new(int size, slist_dtor_func_t dtor) {

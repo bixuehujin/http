@@ -10,19 +10,25 @@
 #include <stdarg.h>
 #include <string.h>
 #include <assert.h>
-#include "helper.h"
-#include "sstring.h"
+#include "clib/helper.h"
+#include "clib/sstring.h"
 
 
-#define sstring_alloc(pss) \
-		if((pss)->ptr == NULL) { \
-			size_t size = (pss)->_alloc; \
-			(pss)->ptr = (pss)->_use_stack ? alloca(size) : malloc(size);\
+#define sstring_alloc(pss) 													\
+		if((pss)->ptr == NULL) { 											\
+			(pss)->ptr = (pss)->_use_stack ? 								\
+				alloca((pss)->_alloc) : calloc((pss)->_alloc, 1);			\
 		}
 
 
-#define sstring_realloc(pss) \
-		(pss)->_use_stack ? alloca()
+#define sstring_realloc(pss, nsize) ({										\
+		typeof(nsize) __nsize = (nsize); 									\
+		void * ptr = (pss)->_use_stack ? 									\
+			realloca((pss)->ptr, (pss)->_alloc, nsize) : 					\
+				realloc((pss)->ptr, __nsize); 								\
+		(pss)->_alloc = __nsize; 											\
+		ptr;																\
+	})
 
 
 sstring_t * sstring_new(size_t size) {
@@ -78,10 +84,7 @@ void sstring_free(sstring_t * ss) {
 }
 
 
-/**
- * TODO big problems works on stack, the same with sstring_sprintf_append()
- */
-bool sstring_append(sstring_t * ss, const char * str) {
+sstring_t * sstring_append(sstring_t * ss, const char * str) {
 
 	sstring_alloc(ss);
 
@@ -94,9 +97,8 @@ bool sstring_append(sstring_t * ss, const char * str) {
 	if(ss->_alloc < ss_len + len + 1) {
 		int c = (len + ss_len) / ss->_alloc + 1;
 
-		ss->_alloc *= c;
-		nptr = realloc(ptr, ss->_alloc);
-		if(!nptr) return false;
+		nptr = sstring_realloc(ss, ss->_alloc * c);
+		if(!nptr) return NULL;
 
 		ss->ptr = nptr;
 	}
@@ -105,12 +107,11 @@ bool sstring_append(sstring_t * ss, const char * str) {
 	while((*(p ++) = *(str ++)) != '\0');
 
 	ss->len += len;
-	return true;
+	return ss;
 }
 
 
-bool sstring_sprintf_append(sstring_t * ss, const char * format, ...) {
-
+sstring_t * sstring_sprintf_append(sstring_t * ss, const char * format, ...) {
 	sstring_alloc(ss);
 
 	int n;
@@ -122,15 +123,15 @@ bool sstring_sprintf_append(sstring_t * ss, const char * format, ...) {
 	n = vsnprintf(ss->ptr + ss_len, buffsize, format, va);
 	va_end(va);
 
-	if(n < 0) return false;
+	if(n < 0) return NULL;
 
 	if(n >= buffsize) { //memory truncated , do realloc.
 		int c = (n + ss_len) / ss->_alloc + 1;
 		char * nptr = NULL;
 
-		ss->_alloc *= c;
-		nptr = realloc(ss->ptr, ss->_alloc);
-		if(!nptr) return false;
+		nptr = sstring_realloc(ss, ss->_alloc * c);
+
+		if(!nptr) return NULL;
 
 		ss->ptr = nptr;
 	}
@@ -139,17 +140,30 @@ bool sstring_sprintf_append(sstring_t * ss, const char * format, ...) {
 	va_start(va, format);
 	n = vsnprintf(ss->ptr + ss_len, buffsize, format, va);
 	va_end(va);
-	if(n < 0) return false;
+	if(n < 0) return NULL;
 
 	ss->len += n;
-	return true;
+	return ss;
+}
+
+
+sstring_t * sstring_appendc(sstring_t * ss, char c) {
+	assert(ss != NULL);
+	sstring_alloc(ss);
+
+	if(ss->len + 1 >= ss->_alloc) {
+		sstring_realloc(ss, ss->_alloc * 2);
+	}
+	ss->ptr[ss->len] = c;
+	ss->ptr[++ss->len] = 0;
+	return ss;
 }
 
 
 void sstring_clear(sstring_t * ss) {
 	assert(ss != NULL);
 	ss->len = 0;
-	if(ss->ptr) {
-		memset(ss->ptr, 0, ss->_alloc);
+	if (ss->ptr) {
+		ss->ptr[0] = '\0';
 	}
 }

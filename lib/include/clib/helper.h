@@ -10,17 +10,23 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <stdint.h>
 
-typedef enum{
+enum {
 	false,
 	true
-}bool;
+};
+
+typedef uint8_t bool;
 typedef void * pointer;
 typedef char * string;
+
 
 #define m_new(type, c)  calloc(sizeof(type), c)
 #define m_new0(type, c) _m_newn(sizeof(type), c, 0)
 #define m_newc(type, c, chr) _m_newn(sizeof(type), c, chr)
+
 
 static inline void * _m_newn(size_t size, size_t count, char c) {
 	void * ret = calloc(size, count);
@@ -30,11 +36,11 @@ static inline void * _m_newn(size_t size, size_t count, char c) {
 }
 
 
-static inline void * realloca(void * ptr, size_t osize, size_t nsize) {
-	void * nptr = alloca(nsize);
+#define realloca(ptr, osize, nsize) ({									\
+		void * nptr = alloca(nsize); 									\
+		memcpy(nptr, ptr, osize); 										\
+		nptr; 															\
+	})
 
-	memcpy(nptr, ptr, osize);
-	return nptr;
-}
 
 #endif /* HELPER_H_ */

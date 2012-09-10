@@ -7,7 +7,7 @@
 
 
 
-#include "sstring.h"
+#include "clib.h"
 
 
 int main(int argc, char **argv) {

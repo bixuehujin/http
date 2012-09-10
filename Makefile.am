@@ -1,1 +1,1 @@
-SUBDIRS=src curl lib
+SUBDIRS=lib src curl 

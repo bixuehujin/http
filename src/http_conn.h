@@ -11,7 +11,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include "helper.h"
+#include "clib.h"
 
 typedef struct _http_conn {
 	int connfd;

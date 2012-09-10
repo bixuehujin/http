@@ -21,11 +21,15 @@ CFLAGS=`echo "$CFLAGS" | sed -e 's/-O[0-9s]*//g'`
 CFLAGS="$CFLAGS -g -O0 -Wall"
 
 AC_PROG_CC
+AC_PROG_RANLIB
+
 AM_PROG_CC_C_O
+
 AC_CONFIG_FILES(Makefile \
+	lib/Makefile \
 	src/Makefile \
-	curl/Makefile \
-	lib/Makefile
+	curl/Makefile
+	
 )
 AC_OUTPUT
 
