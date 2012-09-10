@@ -13,5 +13,6 @@
 #include "clib/slist.h"
 #include "clib/hash_table.h"
 #include "clib/cerror.h"
+#include "clib/quark.h"
 
 #endif /* CLIB_H_ */

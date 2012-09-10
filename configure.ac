@@ -1,24 +1,25 @@
 dnl Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT(http2, 1.0)
+AC_INIT(http, 1.0)
 
 
 AC_CANONICAL_SYSTEM
 AM_INIT_AUTOMAKE()
 
 AC_ARG_ENABLE(debug, [--enable-debug	Enable debugging infomation],
-			USE_DEBUG="$enablevar", USE_DEBUG="no")
-if [ $USE_DEBUG = yes ] ; then
+			USE_DEBUG="yes", USE_DEBUG="no")
+
+if test "$USE_DEBUG" = "yes"  ; then
 	DEBUG=1
 	CFLAGS=`echo "$CFLAGS" | sed -e 's/-O[0-9s]*//g'`
 	CFLAGS="$CFLAGS -g -O0 -Wall"
 else 
-	DEBUG=1
+	DEBUG=0
 fi
 
-CFLAGS=`echo "$CFLAGS" | sed -e 's/-O[0-9s]*//g'`
-CFLAGS="$CFLAGS -g -O0 -Wall"
+#CFLAGS=`echo "$CFLAGS" | sed -e 's/-O[0-9s]*//g'`
+#CFLAGS="$CFLAGS -g -O0 -Wall"
 
 AC_PROG_CC
 AC_PROG_RANLIB
@@ -28,7 +29,8 @@ AM_PROG_CC_C_O
 AC_CONFIG_FILES(Makefile \
 	lib/Makefile \
 	src/Makefile \
-	curl/Makefile
+	curl/Makefile \
+	tests/Makefile
 	
 )
 AC_OUTPUT

@@ -16,7 +16,6 @@
 #include "url.h"
 
 
-
 http_conn_t * http_conn_new(const char * host, unsigned short port) {
 
 	http_conn_t * conn = m_new0(http_conn_t, 1);

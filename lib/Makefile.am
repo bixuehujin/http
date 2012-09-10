@@ -9,7 +9,8 @@ libclib_a_SOURCES=\
 	sstring.c \
 	slist.c \
 	hash_table.c \
-	bitmap.c
+	bitmap.c \
+	quark.c
 
  
 libclib_a_CFLAGS = -Iinclude
