@@ -1,0 +1,16 @@
+.*
+*.[oa]
+README
+aclocal.m4
+autom4te.cache/
+config.guess
+configure
+missing
+src/.deps/
+Makefile.in
+Makefile
+src/Makefile
+src/Makefile.in
+src/http
+config.*
+depcomp
