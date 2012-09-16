@@ -27,7 +27,6 @@ AC_PROG_RANLIB
 AM_PROG_CC_C_O
 
 AC_CONFIG_FILES(Makefile \
-	lib/Makefile \
 	src/Makefile \
 	curl/Makefile \
 	tests/Makefile

@@ -333,10 +333,10 @@ char * url_get_uri(url_t * url) {
 		sstring_append(&ss, url->path);
 	}
 	if(url->query) {
-		sstring_sprintf_append(&ss, "?%s", url->query);
+		sstring_fappend(&ss, "?%s", url->query);
 	}
 	if(url->fragment) {
-		sstring_sprintf_append(&ss, "#%s", url->fragment);
+		sstring_fappend(&ss, "#%s", url->fragment);
 	}
 	return ss.ptr;
 }

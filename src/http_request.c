@@ -106,7 +106,7 @@ void http_request_set_method(http_request_t * req, http_method_t method) {
 
 
 void http_request_add_header(http_request_t * req, const char * name, const char * value) {
-	sstring_sprintf_append(&req->header, "%s: %s\n", name, value);
+	sstring_fappend(&req->header, "%s: %s\n", name, value);
 }
 
 
@@ -162,7 +162,7 @@ bool http_request_preform(http_request_t * req) {
 
 	int response_body_started = 0;
 
-	sstring_sprintf_append(pss,
+	sstring_fappend(pss,
 				"%s %s HTTP %s\n\n",
 				method_names[req->method],
 				req->uri,

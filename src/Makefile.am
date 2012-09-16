@@ -5,6 +5,6 @@ http_SOURCES=http.c \
 	http_request.c
 	
 
-http_CFLAGS=-L../lib -lclib -I../lib/include 
+http_CFLAGS=-L/usr/local/lib -lclib -I../lib/include 
 
-http_LDADD=../lib/libclib.a
+http_LDADD=/usr/local/lib/libclib.a
