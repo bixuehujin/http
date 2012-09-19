@@ -34,9 +34,9 @@ void on_load(char * res, pointer data) {
 	printf("Response Headers:\n");
 	printf("%s\n", req->res_header.ptr);
 
-	hash_table_t * ht = http_request_parse_response_header(req);
-	char * value =  hash_table_find(ht, "Content-Length");
-	hash_table_free(ht);
+	char * content_length = http_request_get_header(req, "Content-Length");
+
+	printf("Content-Length: %s\n", content_length);
 
 	printf("contents:\n%s\n", req->response.ptr);
 }
@@ -55,7 +55,11 @@ int main(int argc, char * argv[]) {
 	req = http_request_new(argv[1]);
 	http_request_set_method(req, METHOD_GET);
 	http_request_set_version(req, "1.1");
+
 	http_request_add_header(req, "Host", "baidu.com");
+	http_request_add_header(req, "Connection", "close");
+	http_request_add_header(req, "Accept", "*/*");
+
 	http_request_on_state_change(req, on_state_change, req);
 	http_request_on_load(req, on_load, req);
 	http_request_preform(req);

@@ -32,6 +32,8 @@ static bool http_request_init(http_request_t *req) {
 	sstring_init(&req->res_header, 512);
 	sstring_init(&req->response, 2048);
 
+	req->ht_headers = hash_table_new(20, free);
+
 	return true;
 }
 
@@ -67,6 +69,16 @@ static void parse_status(http_request_t * req, sstring_t * line) {
 	printf("status: %s\n", line->ptr);
 }
 
+
+static char  * parse_header(sstring_t *ss, char * label) {
+	char * name = strtok(ss->ptr, ":");
+	char * value = strtok(NULL, ":");
+	if(!name || !value ) {
+		return NULL;
+	}
+	strcpy(label, name);
+	return strdup(value);
+}
 
 static void change_state(http_request_t * req, http_state_t state) {
 	if(req->handlers.on_state_change) {
@@ -155,11 +167,16 @@ inline void http_request_on_loadstart(http_request_t *req, http_loadstart_func_t
 }
 
 
+inline char * http_request_get_header(http_request_t * req, const char * name) {
+	return hash_table_find(req->ht_headers, name);
+}
+
+
 bool http_request_preform(http_request_t * req) {
 	sstring_t ss, *pss = NULL, nss;
 	sstring_init(&ss, 100);
 	sstring_init(&nss, 100);
-	char buffer[5000] = {0};
+	char buffer[200] = {0};
 	int response_line = 1;
 	pss = &ss;
 
@@ -187,9 +204,6 @@ bool http_request_preform(http_request_t * req) {
 	int n = write(req->conn->connfd, pss->ptr, pss->len);
 
 
-	//n = read(req->conn->connfd, buffer, sizeof(buffer));
-	//printf("response-%d:%s\n",n, buffer);
-
 	sstring_t * line = NULL;
 	while((line = readline(req->conn->connfd)) && !sstring_empty(line)) {
 		if(response_line == 1) {
@@ -201,6 +215,13 @@ bool http_request_preform(http_request_t * req) {
 		}
 		sstring_append(&req->res_header, line->ptr);
 		printf("header:%s\n", line->ptr);
+
+		char name[200] = {0}, * value;
+		value = parse_header(line, name);
+		if(value) {
+			hash_table_insert(req->ht_headers, name, value);
+		}
+
 		sstring_free(line);
 		response_line ++;
 	}
@@ -214,20 +235,37 @@ bool http_request_preform(http_request_t * req) {
 
 	if(response_body_started && req->method != METHOD_HEAD) {
 		change_state(req, STATE_LOADING);
+		size_t complete = 0;
+		size_t total = 0;
+		char * content_length = atoi(http_request_get_header(req, "Content-Length"));
+		if(content_length) {
+			total = atoi(content_length);
+		}
 		if(req->handlers.on_loadstart) {
 			req->handlers.on_loadstart(req->handlers.loadstart_data);
 		}
+		if(req->handlers.on_progress) {
+			req->handlers.on_progress(complete, total ,req->handlers.progress_data);
+		}
 
-		n = read(req->conn->connfd, buffer, sizeof(buffer));
-		sstring_append(&req->response, buffer);
+		while((n = read(req->conn->connfd, buffer, 100))) {
+			if(n < 0 ) {
+				//error handle there
+				break;
+			}else {
+				sstring_appendl(&req->response, buffer, n);
+				complete += n;
+				if(req->handlers.on_progress) {
+					req->handlers.on_progress(complete, total, req->handlers.progress_data);
+				}
+			}
+		}
 		if(req->handlers.on_load) {
 			req->handlers.on_load(buffer, req->handlers.load_data);
 		}
-
-		change_state(req, STATE_DONE);
-	}else {
-		change_state(req, STATE_DONE);
 	}
+
+	change_state(req, STATE_DONE);
 
 	sstring_destroy(pss);
 	sstring_destroy(&nss);
@@ -247,6 +285,7 @@ void http_request_free(http_request_t * req) {
 	if(req->uri) {
 		free(req->uri);
 	}
+	hash_table_free(req->ht_headers);
 	free(req->url);
 	free(req->ver);
 	free(req);
@@ -282,17 +321,17 @@ hash_table_t * http_request_parse_response_header(http_request_t * req) {
 }
 
 
-int http_request_get_response_status(http_request_t * req) {
+inline int http_request_get_response_status(http_request_t * req) {
 	return req->status;
 }
 
 
-char * http_request_get_response_status_txt(http_request_t * req) {
+inline char * http_request_get_response_status_txt(http_request_t * req) {
 	return req->status_txt;
 }
 
 
-char * http_request_get_response(http_request_t * req) {
+inline char * http_request_get_response(http_request_t * req) {
 	return req->response.ptr;
 }
 

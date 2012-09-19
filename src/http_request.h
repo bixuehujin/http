@@ -55,7 +55,7 @@ typedef void (*http_request_cb_t)();
 typedef void (*http_state_change_func_t)(int state, pointer user_data);
 typedef void (*http_load_func_t)(char * res, pointer user_data);
 typedef void (*http_error_func_t)(int state, pointer user_data);
-typedef void (*http_progress_func_t)(int state, pointer user_data);
+typedef void (*http_progress_func_t)(size_t complete, size_t total, pointer user_data);
 typedef void (*http_loadstart_func_t)(pointer user_data);
 typedef void (*http_timeout_func_t)(pointer user_data);
 
@@ -93,6 +93,9 @@ typedef struct _http_request {
 
 	/*ready state*/
 	http_state_t state;
+
+	/*hash table of headers*/
+	hash_table_t * ht_headers;
 }http_request_t;
 
 #define http_request_on_ex(request, e, func, user_data) \

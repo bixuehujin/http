@@ -15,6 +15,7 @@
 
 static bool resove_host(const char * host, uint16_t port, void * sockaddr, socklen_t *socklen) {
 	struct hostent *ent;
+	//FIXME error check
 	ent = gethostbyname(host);
 	if(ent->h_addrtype != AF_INET) {
 		return false;
