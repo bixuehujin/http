@@ -24,16 +24,16 @@ http_conn_t * http_conn_new(const char * host, uint16_t port) {
 	conn->host = strdup(host);
 	conn->port = port;
 
+	conn->error = NULL;
 	return conn;
 }
 
 
 bool http_conn_connect(http_conn_t * conn) {
-	char * msg = NULL;
-	int fd = tcp_connect(conn->host, conn->port, &msg);
+	cerror_t * error = NULL;
+	int fd = tcp_connect(conn->host, conn->port, &error);
 	if(fd < 0) {
-		conn->errno = ERR_CONN_CANNOT_RESOLVE_HOST;
-		conn->errer = msg;
+		conn->error = error;
 		return false;
 	}
 
@@ -55,12 +55,10 @@ bool http_conn_connect(http_conn_t * conn) {
 }
 
 
+
 void http_conn_free(http_conn_t * conn) {
 	assert(conn != NULL);
 	close(conn->connfd);
 	free(conn->host);
-	if(conn->errer) {
-		free(conn->errer);
-	}
 	free(conn);
 }

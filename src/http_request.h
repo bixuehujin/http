@@ -8,6 +8,7 @@
 #ifndef HTTP_REQUEST_H_
 #define HTTP_REQUEST_H_
 
+#include "errno.h"
 #include "clib.h"
 #include "http_conn.h"
 
@@ -47,6 +48,7 @@ static char * state_names[] = {
 	"DONE",
 	NULL
 };
+
 
 typedef signed char http_state_t;
 
@@ -96,6 +98,9 @@ typedef struct _http_request {
 
 	/*hash table of headers*/
 	hash_table_t * ht_headers;
+
+	/* errors */
+	cerror_t * error;
 }http_request_t;
 
 #define http_request_on_ex(request, e, func, user_data) \
@@ -108,11 +113,13 @@ typedef struct _http_request {
 http_request_t * http_request_new(const char * url);
 void http_request_free(http_request_t * req);
 
+/* setter */
 void http_request_set_url(http_request_t * req, const char * uri);
 void http_request_set_version(http_request_t * req, const char * ver);
 void http_request_set_method(http_request_t * req, http_method_t method);
 void http_request_add_header(http_request_t * req, const char * name, const char * value);
 
+/* events */
 void http_request_on_load(http_request_t * req, http_load_func_t cb, pointer user_data);
 void http_request_on_error(http_request_t * req, http_error_func_t cb, pointer user_data);
 void http_request_on_progress(http_request_t * req, http_progress_func_t cb, pointer user_data);
@@ -120,12 +127,18 @@ void http_request_on_state_change(http_request_t * req, http_state_change_func_t
 void http_request_on_timeout(http_request_t *req, http_timeout_func_t cb, pointer user_data);
 void http_request_on_loadstart(http_request_t *req, http_loadstart_func_t cb, pointer user_data);
 
+/* getter */
 char * http_request_get_response_header(http_request_t * req, const char * name);
 hash_table_t * http_request_parse_response_header(http_request_t * req);
 int http_request_get_response_status(http_request_t * req);
 char * http_request_get_response_status_txt(http_request_t * req);
 char * http_request_get_response(http_request_t * req);
 
+/* perform */
 bool http_request_preform(http_request_t * req);
+
+/* error handle */
+int http_request_get_error(http_request_t * req, char * error);
+void http_request_print_error(http_request_t * req);
 
 #endif /* HTTP_REQUEST_H_ */

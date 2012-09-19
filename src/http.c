@@ -62,7 +62,9 @@ int main(int argc, char * argv[]) {
 
 	http_request_on_state_change(req, on_state_change, req);
 	http_request_on_load(req, on_load, req);
-	http_request_preform(req);
+	if(!http_request_preform(req)) {
+		http_request_print_error(req);
+	}
 
 	http_request_free(req);
 	return 0;

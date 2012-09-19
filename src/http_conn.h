@@ -12,19 +12,14 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include "clib.h"
-
-enum {
-	ERR_CONN_CANNOT_RESOLVE_HOST,
-	ERR_CONN_TIMEOUT,
-};
+#include "http_errno.h"
 
 
 typedef struct _http_conn {
 	int connfd;
 	char * host;
 	short port;
-	int errno;
-	char * errer;
+	cerror_t * error;
 }http_conn_t;
 
 

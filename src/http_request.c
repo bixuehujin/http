@@ -34,6 +34,7 @@ static bool http_request_init(http_request_t *req) {
 
 	req->ht_headers = hash_table_new(20, free);
 
+	req->error = NULL;
 	return true;
 }
 
@@ -92,6 +93,9 @@ http_request_t * http_request_new(const char * url) {
 	assert(ret != NULL);
 	ret->url = strdup(url);
 
+	ret->ver = NULL;
+	ret->uri = NULL;
+
 	ret->handlers.on_load = NULL;
 	ret->handlers.on_error = NULL;
 	ret->handlers.on_progress = NULL;
@@ -99,6 +103,8 @@ http_request_t * http_request_new(const char * url) {
 	ret->handlers.on_timeout = NULL;
 	ret->handlers.on_loadstart = NULL;
 	ret->state = STATE_UNSENT;
+
+
 	http_request_init(ret);
 
 	return ret;
@@ -195,6 +201,7 @@ bool http_request_preform(http_request_t * req) {
 	sstring_appendc(pss, '\n');
 
 	if (!http_conn_connect(req->conn)) {
+		req->error = req->conn->error;
 		return false;
 	}
 	// trigger STATE_OPENED.
@@ -288,6 +295,9 @@ void http_request_free(http_request_t * req) {
 	hash_table_free(req->ht_headers);
 	free(req->url);
 	free(req->ver);
+	if(req->error) {
+		cerror_free(&req->error);
+	}
 	free(req);
 }
 
@@ -336,3 +346,6 @@ inline char * http_request_get_response(http_request_t * req) {
 }
 
 
+void http_request_print_error(http_request_t * req) {
+	cerror_print(req->error);
+}
