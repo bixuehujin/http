@@ -14,7 +14,7 @@
 
 #include "url.h"
 
-static inline const void *zend_memrchr(const void *s, int c, size_t n){
+static inline const void *memrchr(const void *s, int c, size_t n){
 	register const unsigned char *e;
 
 	if (n <= 0) {
@@ -194,7 +194,7 @@ url_t *_url_parse(char const *str, int length){
 	}
 
 	/* check for login and password */
-	if ((p = zend_memrchr(s, '@', (e-s)))) {
+	if ((p = memrchr(s, '@', (e-s)))) {
 		if ((pp = memchr(s, ':', (p-s)))) {
 			if ((pp-s) > 0) {
 				ret->user = strndup(s, (pp-s));
