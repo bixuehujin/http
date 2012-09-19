@@ -326,6 +326,19 @@ end:
 }
 
 
+url_t * url_parse(const char * url) {
+	sstring_t ss = sstring_for_init;
+	url_t * ret;
+	if(!strstr(url, "://")) {
+		sstring_fappend(&ss, "http://%s", url);
+		ret = _url_parse(ss.ptr, ss.len);
+		sstring_destroy(&ss);
+		return ret;
+	}
+	return _url_parse(url, strlen(url));
+}
+
+
 char * url_get_uri(url_t * url) {
 	sstring_t ss ;
 	sstring_init(&ss, 100);

@@ -21,8 +21,7 @@ typedef struct _url {
 	char *fragment;
 }url_t;
 
-#define url_parse(url) _url_parse(url, strlen(url))
-
+url_t * url_parse(const char * url);
 
 char * url_get_uri(url_t * url);
 url_t *_url_parse(char const *str, int length);
