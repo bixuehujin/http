@@ -13,10 +13,18 @@
 #include <unistd.h>
 #include "clib.h"
 
+enum {
+	ERR_CONN_CANNOT_RESOLVE_HOST,
+	ERR_CONN_TIMEOUT,
+};
+
+
 typedef struct _http_conn {
 	int connfd;
 	char * host;
 	short port;
+	int errno;
+	char * errer;
 }http_conn_t;
 
 

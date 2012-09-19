@@ -1,6 +1,4 @@
-#bin_PROGRAMS=quark_test
-#quark_test_SOURCES=quark_test.c
-
-#quark_test_CFLAGS=-L../lib -lclib -I../lib/include 
-
-#quark_test_LDADD=../lib/libclib.a
+bin_PROGRAMS=resolve
+resolve_SOURCES=resolve.c
+resolve_CFLAGS=-lclib -L/usr/local/lib
+resolve_LDADD=/usr/local/lib/libclib.a

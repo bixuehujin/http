@@ -15,7 +15,7 @@
 static bool http_request_init(http_request_t *req) {
 	url_t * url = url_parse(req->url);
 	char * uri = url_get_uri(url);
-	req->uri = uri ? strdup(uri) : strdup("");
+	req->uri = uri ? strdup(uri) : strdup("/");
 	if(uri) {
 		free(uri);
 	}
@@ -60,16 +60,17 @@ static void parse_status(http_request_t * req, sstring_t * line) {
 	char * fstr = NULL;
 
 	fstr = memchr(line->ptr, ' ', line->len);
-	req->status = atoi(fstr ++);
+	req->status = atoi(++fstr);
 
 	fstr = memchr(fstr, ' ', strlen(fstr));
 	req->status_txt = strdup(fstr);
+	printf("status: %s\n", line->ptr);
 }
 
 
 static void change_state(http_request_t * req, http_state_t state) {
-	if(req->on_state_change) {
-		req->on_state_change(state, req->state_change_data);
+	if(req->handlers.on_state_change) {
+		req->handlers.on_state_change(state, req->handlers.state_change_data);
 	}
 }
 
@@ -79,10 +80,12 @@ http_request_t * http_request_new(const char * url) {
 	assert(ret != NULL);
 	ret->url = strdup(url);
 
-	ret->on_load = NULL;
-	ret->on_error = NULL;
-	ret->on_progress = NULL;
-	ret->on_state_change = NULL;
+	ret->handlers.on_load = NULL;
+	ret->handlers.on_error = NULL;
+	ret->handlers.on_progress = NULL;
+	ret->handlers.on_state_change = NULL;
+	ret->handlers.on_timeout = NULL;
+	ret->handlers.on_loadstart = NULL;
 	ret->state = STATE_UNSENT;
 	http_request_init(ret);
 
@@ -90,65 +93,65 @@ http_request_t * http_request_new(const char * url) {
 }
 
 
-void http_request_set_uri(http_request_t * req, const char * uri) {
+inline void http_request_set_uri(http_request_t * req, const char * uri) {
 	req->uri = strdup(uri);
 }
 
 
-void http_request_set_version(http_request_t * req, const char * ver) {
+inline void http_request_set_version(http_request_t * req, const char * ver) {
 	req->ver = strdup(ver);
 }
 
 
-void http_request_set_method(http_request_t * req, http_method_t method) {
+inline void http_request_set_method(http_request_t * req, http_method_t method) {
 	req->method = method;
 }
 
 
-void http_request_add_header(http_request_t * req, const char * name, const char * value) {
-	sstring_fappend(&req->header, "%s: %s\n", name, value);
+inline void http_request_add_header(http_request_t * req, const char * name, const char * value) {
+	sstring_fappend(&req->header, "%s: %s\r\n", name, value);
 }
 
 
-void http_request_on_load(http_request_t * req, http_load_func_t cb, pointer data) {
+inline void http_request_on_load(http_request_t * req, http_load_func_t cb, pointer data) {
 	assert(req != NULL);
-	req->on_load = cb;
-	req->load_data = data;
+	req->handlers.on_load = cb;
+	req->handlers.load_data = data;
 }
 
 
-void http_request_on_error(http_request_t * req, http_error_func_t cb, pointer data) {
+inline void http_request_on_error(http_request_t * req, http_error_func_t cb, pointer data) {
 	assert(req != NULL);
-	req->on_error = cb;
-	req->error_data = data;
+	req->handlers.on_error = cb;
+	req->handlers.error_data = data;
 }
 
 
-void http_request_on_progress(http_request_t * req, http_progress_func_t cb, pointer data) {
+inline void http_request_on_progress(http_request_t * req, http_progress_func_t cb, pointer data) {
 	assert(req != NULL);
-	req->on_progress = cb;
-	req->progress_data = data;
+	req->handlers.on_progress = cb;
+	req->handlers.progress_data = data;
 }
 
 
-void http_request_on_state_change(http_request_t * req, http_state_change_func_t cb, pointer user_data) {
+inline inline void http_request_on_state_change(http_request_t * req, http_state_change_func_t cb, pointer user_data) {
 	assert(req != NULL);
-	req->on_state_change = cb;
-	req->state_change_data = user_data;
+	req->handlers.on_state_change = cb;
+	req->handlers.state_change_data = user_data;
 }
 
 
-void http_request_on_timeout(http_request_t *req, http_timeout_func_t cb, pointer user_data) {
+inline void http_request_on_timeout(http_request_t *req, http_timeout_func_t cb, pointer user_data) {
 	assert(req != NULL);
-	req->on_timeout = cb;
-	req->timeout_data = user_data;
+	req->handlers.on_timeout = cb;
+	req->handlers.timeout_data = user_data;
 }
 
 
-void http_request_on_loadstart(http_request_t *req, http_loadstart_func_t cb, pointer user_data) {
+inline void http_request_on_loadstart(http_request_t *req, http_loadstart_func_t cb, pointer user_data) {
 	assert(req != NULL);
-	req->on_loadstart = cb;
-	req->loadstart_data = user_data;
+	req->handlers.on_loadstart = cb;
+	req->handlers.loadstart_data = user_data;
 }
 
 
@@ -163,25 +166,29 @@ bool http_request_preform(http_request_t * req) {
 	int response_body_started = 0;
 
 	sstring_fappend(pss,
-				"%s %s HTTP %s\n\n",
+				"%s %s HTTP/%s\r\n",
 				method_names[req->method],
 				req->uri,
 				req->ver
 	);
-
 	if(!sstring_empty(&req->header)) {
 		sstring_append(pss, req->header.ptr);
 	}
 
+	sstring_appendc(pss, '\n');
+
 	if (!http_conn_connect(req->conn)) {
 		return false;
 	}
-
-	// tigger STATE_OPENED.
+	// trigger STATE_OPENED.
 	change_state(req, STATE_OPENED);
 
+	//printf("request header: %s len:%d\n", pss->ptr, pss->len);
 	int n = write(req->conn->connfd, pss->ptr, pss->len);
 
+
+	//n = read(req->conn->connfd, buffer, sizeof(buffer));
+	//printf("response-%d:%s\n",n, buffer);
 
 	sstring_t * line = NULL;
 	while((line = readline(req->conn->connfd)) && !sstring_empty(line)) {
@@ -207,13 +214,14 @@ bool http_request_preform(http_request_t * req) {
 
 	if(response_body_started && req->method != METHOD_HEAD) {
 		change_state(req, STATE_LOADING);
-		if(req->on_loadstart) {
-			req->on_loadstart(req->loadstart_data);
+		if(req->handlers.on_loadstart) {
+			req->handlers.on_loadstart(req->handlers.loadstart_data);
 		}
 
 		n = read(req->conn->connfd, buffer, sizeof(buffer));
-		if(req->on_load) {
-			req->on_load(buffer, req->load_data);
+		sstring_append(&req->response, buffer);
+		if(req->handlers.on_load) {
+			req->handlers.on_load(buffer, req->handlers.load_data);
 		}
 
 		change_state(req, STATE_DONE);

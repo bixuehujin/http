@@ -59,16 +59,7 @@ typedef void (*http_progress_func_t)(int state, pointer user_data);
 typedef void (*http_loadstart_func_t)(pointer user_data);
 typedef void (*http_timeout_func_t)(pointer user_data);
 
-typedef struct _http_request {
-	/*request info*/
-	char * url;
-	char * uri;
-	char * ver;
-	unsigned char  method;
-	http_conn_t * conn;
-	sstring_t   header;
-
-	/*handlers*/
+typedef struct _http_request_handlers {
 	http_loadstart_func_t on_loadstart;
 	http_load_func_t on_load;
 	http_error_func_t on_error;
@@ -81,6 +72,18 @@ typedef struct _http_request {
 	pointer state_change_data;
 	pointer timeout_data;
 	pointer loadstart_data;
+}http_request_handlers_t;
+
+
+typedef struct _http_request {
+	/*request info*/
+	char * url;
+	char * uri;
+	char * ver;
+	unsigned char  method;
+	http_conn_t * conn;
+	sstring_t   header;
+	http_request_handlers_t handlers;
 
 	/*response message*/
 	int status;

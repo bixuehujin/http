@@ -14,31 +14,30 @@
 #include <arpa/inet.h>
 #include "http_conn.h"
 #include "url.h"
+#include "tcp.h"
 
-
-http_conn_t * http_conn_new(const char * host, unsigned short port) {
+http_conn_t * http_conn_new(const char * host, uint16_t port) {
 
 	http_conn_t * conn = m_new0(http_conn_t, 1);
-	int sockfd;
 	assert(conn != NULL);
 
 	conn->host = strdup(host);
 	conn->port = port;
 
-	sockfd = socket(PF_INET, SOCK_STREAM, 0);
-	if(sockfd < 0) {
-		perror("socket()");
-		free(conn->host);
-		free(conn);
-		return NULL;
-	}
-
-	conn->connfd = sockfd;
 	return conn;
 }
 
 
 bool http_conn_connect(http_conn_t * conn) {
+	char * msg = NULL;
+	int fd = tcp_connect(conn->host, conn->port, &msg);
+	if(fd < 0) {
+		conn->errno = ERR_CONN_CANNOT_RESOLVE_HOST;
+		conn->errer = msg;
+		return false;
+	}
+
+	/*
 	struct sockaddr_in sockaddr;
 	memset(&sockaddr, 0, sizeof(sockaddr));
 	sockaddr.sin_family = AF_INET;
@@ -50,6 +49,8 @@ bool http_conn_connect(http_conn_t * conn) {
 		perror("connect()");
 		return false;
 	}
+	*/
+	conn->connfd = fd;
 	return true;
 }
 
@@ -58,5 +59,8 @@ void http_conn_free(http_conn_t * conn) {
 	assert(conn != NULL);
 	close(conn->connfd);
 	free(conn->host);
+	if(conn->errer) {
+		free(conn->errer);
+	}
 	free(conn);
 }
