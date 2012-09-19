@@ -188,22 +188,24 @@ bool http_request_preform(http_request_t * req) {
 
 	int response_body_started = 0;
 
+	if (!http_conn_connect(req->conn)) {
+		req->error = req->conn->error;
+		return false;
+	}
+
 	sstring_fappend(pss,
-				"%s %s HTTP/%s\r\n",
-				method_names[req->method],
-				req->uri,
-				req->ver
-	);
+					"%s %s HTTP/%s\r\n",
+					method_names[req->method],
+					req->uri,
+					req->ver
+		);
+
 	if(!sstring_empty(&req->header)) {
 		sstring_append(pss, req->header.ptr);
 	}
 
 	sstring_appendc(pss, '\n');
 
-	if (!http_conn_connect(req->conn)) {
-		req->error = req->conn->error;
-		return false;
-	}
 	// trigger STATE_OPENED.
 	change_state(req, STATE_OPENED);
 

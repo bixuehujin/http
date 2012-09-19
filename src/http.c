@@ -45,7 +45,7 @@ void on_load(char * res, pointer data) {
 int main(int argc, char * argv[]) {
 
 	if(argc < 2) {
-		printf("Usage: http url\n");
+		printf("Usage: %s url\n", argv[0]);
 		exit(1);
 	}
 	clib_init();
