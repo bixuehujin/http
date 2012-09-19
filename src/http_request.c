@@ -214,7 +214,7 @@ bool http_request_preform(http_request_t * req) {
 			break;
 		}
 		sstring_append(&req->res_header, line->ptr);
-		printf("header:%s\n", line->ptr);
+		//printf("header:%s\n", line->ptr);
 
 		char name[200] = {0}, * value;
 		value = parse_header(line, name);
@@ -237,7 +237,7 @@ bool http_request_preform(http_request_t * req) {
 		change_state(req, STATE_LOADING);
 		size_t complete = 0;
 		size_t total = 0;
-		char * content_length = atoi(http_request_get_header(req, "Content-Length"));
+		char * content_length = http_request_get_header(req, "Content-Length");
 		if(content_length) {
 			total = atoi(content_length);
 		}
