@@ -5,35 +5,20 @@
  *      Author: hujin
  */
 
-#include <string.h>
-#include <assert.h>
+#include "http.h"
 #include "url.h"
+#include "http_conn.h"
+#include "http_message.h"
 #include "http_request.h"
 
 
 
 static bool http_request_init(http_request_t *req) {
-	url_t * url = url_parse(req->url);
-	char * uri = url_get_uri(url);
-	req->uri = uri ? strdup(uri) : strdup("/");
-	if(uri) {
-		free(uri);
-	}
 
-	http_conn_t * conn = http_conn_new(url->host, url->port ? url->port : 80);
-	assert(conn != NULL);
-	if(!conn) {
-		return false;
-	}
-	req->conn = conn;
-	url_free(url);
-
-	sstring_init(&req->header, 200);
-	sstring_init(&req->res_header, 512);
-	sstring_init(&req->response, 2048);
+	http_conn_pool_start();
 
 	req->ht_headers = hash_table_new(20, free);
-
+	req->messages = slist_new(http_message_t *, NULL);
 	req->error = NULL;
 	return true;
 }
@@ -41,60 +26,46 @@ static bool http_request_init(http_request_t *req) {
 /**
  *
  */
-static sstring_t * readline(int fd) {
-	sstring_t * ret = sstring_new(100);
+static bool readline(int fd, sstring_t *ret) {
 	char buffer[2] = {0};
 	size_t n;
 	while((n = read(fd, buffer, 1)) >= 0) {
 		if(n == 0) {
-			return NULL;
+			return false;
 		}
-		if(buffer[0] == '\n') {
+		if(buffer[0] == '\r') {
+			read(fd, buffer, 1);
 			break;
 		}
-		sstring_append(ret, buffer);
+		sstring_appendc(ret, buffer[0]);
 	}
-	return ret;
-}
-
-
-
-static void parse_status(http_request_t * req, sstring_t * line) {
-	char * fstr = NULL;
-
-	fstr = memchr(line->ptr, ' ', line->len);
-	req->status = atoi(++fstr);
-
-	fstr = memchr(fstr, ' ', strlen(fstr));
-	req->status_txt = strdup(fstr);
-	printf("status: %s\n", line->ptr);
+	return true;
 }
 
 
 static char  * parse_header(sstring_t *ss, char * label) {
-	char * name = strtok(ss->ptr, ":");
-	char * value = strtok(NULL, ":");
-	if(!name || !value ) {
-		return NULL;
+	int i = 0;
+	char * str = ss->ptr;
+	for(; *str != ':'; label ++, str ++) {
+		*label = *str;
 	}
-	strcpy(label, name);
-	return strdup(value);
+	*label = '\0';
+	str++;
+	for(;*str == ' '; str ++);
+	return strdup(str);
 }
 
-static void change_state(http_request_t * req, http_state_t state) {
+
+static void change_state(http_request_t * req,http_message_t *msg, http_state_t state) {
 	if(req->handlers.on_state_change) {
-		req->handlers.on_state_change(state, req->handlers.state_change_data);
+		req->handlers.on_state_change(msg, state, req->handlers.state_change_data);
 	}
 }
 
 
-http_request_t * http_request_new(const char * url) {
+http_request_t * http_request_new() {
 	http_request_t * ret = m_new0(http_request_t, 1);
 	assert(ret != NULL);
-	ret->url = strdup(url);
-
-	ret->ver = NULL;
-	ret->uri = NULL;
 
 	ret->handlers.on_load = NULL;
 	ret->handlers.on_error = NULL;
@@ -108,26 +79,6 @@ http_request_t * http_request_new(const char * url) {
 	http_request_init(ret);
 
 	return ret;
-}
-
-
-inline void http_request_set_uri(http_request_t * req, const char * uri) {
-	req->uri = strdup(uri);
-}
-
-
-inline void http_request_set_version(http_request_t * req, const char * ver) {
-	req->ver = strdup(ver);
-}
-
-
-inline void http_request_set_method(http_request_t * req, http_method_t method) {
-	req->method = method;
-}
-
-
-inline void http_request_add_header(http_request_t * req, const char * name, const char * value) {
-	sstring_fappend(&req->header, "%s: %s\r\n", name, value);
 }
 
 
@@ -173,184 +124,152 @@ inline void http_request_on_loadstart(http_request_t *req, http_loadstart_func_t
 }
 
 
-inline char * http_request_get_header(http_request_t * req, const char * name) {
-	return hash_table_find(req->ht_headers, name);
+static void parse_status(http_message_t * msg, sstring_t * line) {
+	char * fstr = NULL;
+
+	fstr = memchr(line->ptr, ' ', line->len);
+	msg->status = atoi(++fstr);
+
+	fstr = memchr(fstr, ' ', strlen(fstr));
+	msg->status_txt = strdup(fstr);
 }
 
 
-static void http_request_fetch_header(http_request_t * req) {
+static void fetch_header(http_request_t * req, http_conn_t * conn, http_message_t * msg) {
 	int response_line = 1;
-	sstring_t * line = NULL;
-	while((line = readline(req->conn->connfd)) && !sstring_empty(line)) {
+	sstring_t  line = sstring_for_init;
+	while((readline(conn->connfd, &line)) && !sstring_empty(&line)) {
 		if(response_line == 1) {
-			parse_status(req, line);
+			parse_status(msg, &line);
+			response_line ++;
+			sstring_clear(&line);
+			continue;
 		}
-		if(strcmp(line->ptr, "\r") == 0) {
+		if(strcmp(line.ptr, "\r") == 0) {
 			break;
 		}
-		sstring_append(&req->res_header, line->ptr);
-		//printf("header:%s\n", line->ptr);
-
+		sstring_fappend(&msg->raw_headers, "%s\n", line.ptr);
 		char name[200] = {0}, * value;
-		value = parse_header(line, name);
+		value = parse_header(&line, name);
 		if(value) {
-			hash_table_insert(req->ht_headers, name, value);
+			hash_table_insert(msg->headers, name, value);
 		}
-
-		sstring_free(line);
+		if(strcmp(name, "Content-Length") == 0) {
+			msg->length = atoi(value);
+		}
 		response_line ++;
+		sstring_clear(&line);
 	}
 
 	//headers received
-	change_state(req, STATE_HEADERS_RECEIVED);
-
-	if(line) {
-		sstring_free(line);
-	}
+	change_state(req, msg, STATE_HEADERS_RECEIVED);
+	sstring_destroy(&line);
 }
 
 
-static void build_request_header(http_request_t *req, sstring_t *ss) {
+/**
+ * build a request header form http_message object .
+ */
+static void build_request_header(http_message_t *msg, sstring_t *ss) {
+	char * uri = url_get_uri(msg->url);
 	sstring_fappend(ss,
 					"%s %s HTTP/%s\r\n",
-					method_names[req->method],
-					req->uri,
-					req->ver
+					method_names[msg->method],
+					uri ? uri : "/",
+					msg->ver
 		);
-
-	if(!sstring_empty(&req->header)) {
-		sstring_append(ss, req->header.ptr);
+	free(uri);
+	if(!sstring_empty(&msg->raw_headers)) {
+		sstring_append(ss, msg->raw_headers.ptr);
 	}
 
 	sstring_appendc(ss, '\n');
 }
 
 
-bool http_request_preform(http_request_t * req) {
-	sstring_t ss;
-	sstring_init(&ss, 100);
-	char buffer[200] = {0};
+bool http_request_run(http_request_t * req) {
+	sstring_t req_header = sstring_for_init;
+	http_message_t * req_message = (pointer)(*(size_t *)slist_head(req->messages));
+	http_message_t * res_message = NULL;
+	cerror_t * error = NULL;
+	char * buffer[200] = {0};
 
-	build_request_header(req, &ss);
+	build_request_header(req_message, &req_header);
 
-
-	if (!http_conn_connect(req->conn)) {
-		req->error = req->conn->error;
+	http_conn_t * conn = http_conn_pool_get_conn(req_message->url->host, req_message->url->port ? req_message->url->port : 80, &error);
+	if(!conn) {
+		req->error = error;
+		sstring_destroy(&req_header);
 		return false;
 	}
-	// trigger STATE_OPENED.
-	change_state(req, STATE_OPENED);
 
-	//printf("request header: %s len:%d\n", pss->ptr, pss->len);
-	int n = write(req->conn->connfd, ss.ptr, ss.len);
+	res_message = http_message_new(MESSAGE_RESPONSE);
+	res_message->req = req_message;
 
-	//fetch header and stored in hash table.
-	http_request_fetch_header(req);
+	change_state(req, res_message, STATE_OPENED);
 
-	if(req->method != METHOD_HEAD) {
-		change_state(req, STATE_LOADING);
+
+	int n = write(conn->connfd, req_header.ptr, req_header.len);
+
+	fetch_header(req, conn, res_message);
+
+	if(req_message->method != METHOD_HEAD) {
+		change_state(req, res_message, STATE_LOADING);
 		size_t complete = 0;
 		size_t total = 0;
-		char * content_length = http_request_get_header(req, "Content-Length");
+		char * content_length = http_message_get_header(res_message, "Content-Length");
 		if(content_length) {
 			total = atoi(content_length);
 		}
 		if(req->handlers.on_loadstart) {
-			req->handlers.on_loadstart(req->handlers.loadstart_data);
+			req->handlers.on_loadstart(res_message, req->handlers.loadstart_data);
 		}
 		if(req->handlers.on_progress) {
-			req->handlers.on_progress(complete, total ,req->handlers.progress_data);
+			req->handlers.on_progress(res_message, complete, total ,req->handlers.progress_data);
 		}
 
-		while((n = read(req->conn->connfd, buffer, 100))) {
+		while((n = read(conn->connfd, buffer, 100))) {
 			if(n < 0 ) {
 				//error handle there
 				break;
 			}else {
-				sstring_appendl(&req->response, buffer, n);
+				sstring_appendl(&res_message->body, buffer, n);
 				complete += n;
 				if(req->handlers.on_progress) {
-					req->handlers.on_progress(complete, total, req->handlers.progress_data);
+					req->handlers.on_progress(res_message, complete, total, req->handlers.progress_data);
 				}
 			}
 		}
 		if(req->handlers.on_load) {
-			req->handlers.on_load(buffer, req->handlers.load_data);
+			req->handlers.on_load(res_message, req->handlers.load_data);
 		}
 	}
 
-	change_state(req, STATE_DONE);
-	sstring_destroy(&ss);
+	change_state(req, res_message, STATE_DONE);
 
+	sstring_destroy(&req_header);
 	return true;
 }
 
 
 void http_request_free(http_request_t * req) {
 	assert(req != NULL);
-	http_conn_free(req->conn);
 
-	sstring_destroy(&req->header);
-	sstring_destroy(&req->res_header);
-	sstring_destroy(&req->response);
-	free(req->status_txt);
-	if(req->uri) {
-		free(req->uri);
-	}
 	hash_table_free(req->ht_headers);
-	free(req->url);
-	free(req->ver);
 	if(req->error) {
 		cerror_free(&req->error);
 	}
+	slist_free(req->messages);
 	free(req);
-}
-
-
-char * http_request_get_response_header(http_request_t * req, const char * name) {
-	return req->res_header.ptr;
-}
-
-
-hash_table_t * http_request_parse_response_header(http_request_t * req) {
-
-	if(sstring_empty(&req->res_header)) {
-		return NULL;
-	}
-
-	hash_table_t * ret = hash_table_new(30, free);
-	char * header = req->res_header.ptr;
-	char * name, * value, *line;
-	char * saveptr1, * saveptr2;
-
-	line = strtok_r(header, "\r", &saveptr1);
-	while(line) {
-		line = strtok_r(NULL, "\r", &saveptr1);
-		if(!line) break;
-		name = strtok_r(line, ":", &saveptr2);
-		value = strtok_r(NULL, ":", &saveptr2);
-		hash_table_insert(ret, name, strdup(value));
-	}
-
-	return ret;
-}
-
-
-inline int http_request_get_response_status(http_request_t * req) {
-	return req->status;
-}
-
-
-inline char * http_request_get_response_status_txt(http_request_t * req) {
-	return req->status_txt;
-}
-
-
-inline char * http_request_get_response(http_request_t * req) {
-	return req->response.ptr;
+	http_conn_pool_shutdown();
 }
 
 
 void http_request_print_error(http_request_t * req) {
 	cerror_print(req->error);
+}
+
+
+void http_request_add_message(http_request_t * req, http_message_t **msg) {
+	slist_append(req->messages, msg);
 }

@@ -8,11 +8,7 @@
 #ifndef HTTP_CONN_H_
 #define HTTP_CONN_H_
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include "clib.h"
-#include "http_errno.h"
+#include "http.h"
 
 
 typedef struct _http_conn {
@@ -26,5 +22,9 @@ typedef struct _http_conn {
 http_conn_t * http_conn_new(const char * host, unsigned short port);
 bool http_conn_connect(http_conn_t * conn);
 void http_conn_free(http_conn_t * conn);
+
+void http_conn_pool_start();
+void http_conn_pool_shutdown();
+http_conn_t * http_conn_pool_get_conn(const char * host, uint16_t port, cerror_t **error);
 
 #endif /* HTTP_CONN_H_ */

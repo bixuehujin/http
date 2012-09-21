@@ -3,7 +3,8 @@ http_SOURCES=http.c \
 	http_conn.c \
 	url.c \
 	http_request.c \
-	tcp.c
+	tcp.c \
+	http_message.c
 	
 
 http_CFLAGS=-L/usr/local/lib -lclib -I../lib/include 
