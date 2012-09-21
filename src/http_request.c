@@ -178,48 +178,14 @@ inline char * http_request_get_header(http_request_t * req, const char * name) {
 }
 
 
-bool http_request_preform(http_request_t * req) {
-	sstring_t ss, *pss = NULL, nss;
-	sstring_init(&ss, 100);
-	sstring_init(&nss, 100);
-	char buffer[200] = {0};
+static void http_request_fetch_header(http_request_t * req) {
 	int response_line = 1;
-	pss = &ss;
-
-	int response_body_started = 0;
-
-	if (!http_conn_connect(req->conn)) {
-		req->error = req->conn->error;
-		return false;
-	}
-
-	sstring_fappend(pss,
-					"%s %s HTTP/%s\r\n",
-					method_names[req->method],
-					req->uri,
-					req->ver
-		);
-
-	if(!sstring_empty(&req->header)) {
-		sstring_append(pss, req->header.ptr);
-	}
-
-	sstring_appendc(pss, '\n');
-
-	// trigger STATE_OPENED.
-	change_state(req, STATE_OPENED);
-
-	//printf("request header: %s len:%d\n", pss->ptr, pss->len);
-	int n = write(req->conn->connfd, pss->ptr, pss->len);
-
-
 	sstring_t * line = NULL;
 	while((line = readline(req->conn->connfd)) && !sstring_empty(line)) {
 		if(response_line == 1) {
 			parse_status(req, line);
 		}
 		if(strcmp(line->ptr, "\r") == 0) {
-			response_body_started = 1;
 			break;
 		}
 		sstring_append(&req->res_header, line->ptr);
@@ -241,8 +207,47 @@ bool http_request_preform(http_request_t * req) {
 	if(line) {
 		sstring_free(line);
 	}
+}
 
-	if(response_body_started && req->method != METHOD_HEAD) {
+
+static void build_request_header(http_request_t *req, sstring_t *ss) {
+	sstring_fappend(ss,
+					"%s %s HTTP/%s\r\n",
+					method_names[req->method],
+					req->uri,
+					req->ver
+		);
+
+	if(!sstring_empty(&req->header)) {
+		sstring_append(ss, req->header.ptr);
+	}
+
+	sstring_appendc(ss, '\n');
+}
+
+
+bool http_request_preform(http_request_t * req) {
+	sstring_t ss;
+	sstring_init(&ss, 100);
+	char buffer[200] = {0};
+
+	build_request_header(req, &ss);
+
+
+	if (!http_conn_connect(req->conn)) {
+		req->error = req->conn->error;
+		return false;
+	}
+	// trigger STATE_OPENED.
+	change_state(req, STATE_OPENED);
+
+	//printf("request header: %s len:%d\n", pss->ptr, pss->len);
+	int n = write(req->conn->connfd, ss.ptr, ss.len);
+
+	//fetch header and stored in hash table.
+	http_request_fetch_header(req);
+
+	if(req->method != METHOD_HEAD) {
 		change_state(req, STATE_LOADING);
 		size_t complete = 0;
 		size_t total = 0;
@@ -275,9 +280,7 @@ bool http_request_preform(http_request_t * req) {
 	}
 
 	change_state(req, STATE_DONE);
-
-	sstring_destroy(pss);
-	sstring_destroy(&nss);
+	sstring_destroy(&ss);
 
 	return true;
 }

@@ -57,7 +57,7 @@ int main(int argc, char * argv[]) {
 	http_request_set_version(req, "1.1");
 
 	http_request_add_header(req, "Host", "baidu.com");
-	http_request_add_header(req, "Connection", "close");
+	//http_request_add_header(req, "Connection", "close");
 	http_request_add_header(req, "Accept", "*/*");
 
 	http_request_on_state_change(req, on_state_change, req);

@@ -6,6 +6,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/select.h>
 #include <netinet/in.h>
 #include <unistd.h>
 #include <netdb.h>
@@ -14,14 +15,12 @@
 #include "http_errno.h"
 
 
-static bool resove_host(const char * host, uint16_t port, void * sockaddr, socklen_t *socklen, cerror_t ** error) {
+static bool resolve_host(const char * host, uint16_t port, void * sockaddr, socklen_t *socklen, cerror_t ** error) {
 	struct hostent *ent;
-	sstring_t ss = sstring_for_init;
 
 	if(!(ent = gethostbyname(host))) {
 		if(error) {
-			sstring_fappend(&ss, "%d: %s", h_errno, hstrerror(h_errno));
-			*error = cerror_new("resolve_host", ERR_CANNOT_RESOLVE_HOST, ss.ptr);
+			*error = cerror_new("resolve_host", ERR_CANNOT_RESOLVE_HOST, "%d: %s", h_errno, hstrerror(h_errno));
 		}
 		return false;
 	}
@@ -41,14 +40,16 @@ static bool resove_host(const char * host, uint16_t port, void * sockaddr, sockl
 }
 
 
+/**
+ * this function would block until the connection is established or an error occurred.
+ */
 int tcp_connect(const char * host, uint16_t port, cerror_t ** error) {
 	int fd;
 	struct sockaddr_in in;
 	socklen_t socklen;
-	sstring_t ss = sstring_for_init;
 	cerror_t * oerror = NULL;
 
-	if(!resove_host(host, port, &in, &socklen, &oerror)) {
+	if(!resolve_host(host, port, &in, &socklen, &oerror)) {
 		*error = oerror;
 		return -1;
 	}
@@ -56,26 +57,60 @@ int tcp_connect(const char * host, uint16_t port, cerror_t ** error) {
 
 	fd = socket(AF_INET, SOCK_STREAM, 0);
 	if(fd < 0) {
-		sstring_fappend(&ss, "%d: %s", errno, strerror(errno));
-		*error = cerror_new("tcp_connect", ERR_CREATE_SOCKET_FAILED, ss.ptr);
+		*error = cerror_new("tcp_connect", ERR_CREATE_SOCKET_FAILED, "%d: %s", errno, strerror(errno));
 		return -1;
 	}
 
-	again:
 	if(connect(fd, (struct sockaddr *)&in, socklen) < 0) {
-		sstring_fappend(&ss, "%d: %s", errno, strerror(errno));
-		*error = cerror_new("tcp_connect", 0, NULL);;
+		fd_set rset, wset;
+		struct timeval tmout;
+
 		switch(errno) {
 		case ECONNREFUSED:
-			cerror_set_error(*error, ERR_CONN_REFUSED, ss.ptr);
-			break;
-		case EINTR:
-			goto again;
-			break;
-		default:
-			cerror_set_error(*error, ERR_UNKNOWN, ss.ptr);
+			*error = cerror_new("tcp_connect", ERR_CONN_REFUSED, "%d: %s", errno, strerror(errno));;
 			return -1;
+		case EINTR:
+			/**
+			 * the connect system call may be interrupted by a signal, but the connection is continue,
+			 * we should not restart the connect, but using select to wait the socket readable.
+			 * @see UNPV1 chapter 16.4
+			 */
+			FD_ZERO(&rset);
+			FD_ZERO(&wset);
+			FD_SET(fd, &rset);
+			FD_SET(fd, &wset);
+			tmout.tv_sec = 10;
+			tmout.tv_usec = 0;
+
+			int r;
+			for(;;) {
+				r = select(fd + 1, &rset, &wset, NULL, &tmout);
+				if(r < 0) {
+					if(errno == EINTR) {
+						continue;
+					}
+				}else if(r == 0) {
+					*error = cerror_new("tcp_connect", ERR_CONN_TIMEOUT, strdup("Connection Timed Out"));
+					return -1;
+				}else {
+					if(FD_ISSET(fd, &rset) && FD_ISSET(fd, &wset)) {//error occurred
+						int nerror;
+						socklen_t len = sizeof(nerror);
+						if(getsockopt(fd, SOL_SOCKET, SO_ERROR, &nerror, &len) >= 0) {
+							*error = cerror_new("tcp_connect", ERR_UNKNOWN, "%d: %s", errno, strerror(errno));
+						}
+						return -1;
+					}
+					return fd;
+				}
+			}
 			break;
+		case ETIMEDOUT:
+			*error = cerror_new("tcp_connect", ERR_CONN_TIMEOUT, "%d: %s", errno, strerror(errno));
+			return -1;
+		default:
+			*error = cerror_new("tcp_connect", ERR_UNKNOWN, "%d: %s", errno, strerror(errno));
+			return -1;
 		}
 	}
 

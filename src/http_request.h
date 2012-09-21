@@ -87,7 +87,7 @@ typedef struct _http_request {
 	sstring_t   header;
 	http_request_handlers_t handlers;
 
-	/*response message*/
+	/* response message */
 	int status;
 	char *  status_txt;
 	sstring_t  res_header;
